@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<!-- for reference, see:
+  -- https://dev.to/luispa/lets-try-react-without-nodejs-3a7
+  -- https://reactjs.org/docs/hello-world.html
+  -->
+
+<!-- Code help from:
+  -- https://imranhsayed.medium.com/live-search-with-react-instant-search-pagination-6acd476af756
+  -- https://reactjs.org/docs/dom-elements.html#dangerouslysetinnerhtml
+  -- https://stackoverflow.com/questions/52225099/react-render-html-code-dangerouslysetinnerhtml
+  -- https://stackoverflow.com/questions/4328500/how-can-i-strip-all-punctuation-from-a-string-in-javascript-using-regex
+  -->
+<html lang="en">
+
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>React Local</title>
+  <script type="application/javascript" src="https://unpkg.com/react@16.0.0/umd/react.development.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/react-dom@16.0.0/umd/react-dom.development.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/babel-standalone@6.26.0/babel.js"></script>
+
+
+  <!-- your custom CSS goes here: -->
+  <style>
+    em{font-weight: bolder}
+
+    .heading {
+      font-size: 30px;
+      padding: 20px 0;
+      color:black;
+      text-align: center;
+    }
+    /*Container*/
+    .container {
+      margin: 36px auto;
+      width: 100%;
+      max-width: 800px;
+    }
+    .search-label {
+      position: relative;
+      width: 100%;
+      text-align: center;
+    }
+    .container input {
+      height:25px;
+      padding: 18px;
+      font-size: 18px;
+      font-style: italic;
+      color: black;
+      border-radius: 25px;
+      border: 2px solid black;
+      
+    }
+
+    .interactive {
+      display:grid;
+      grid-template-columns: 3fr 2fr 1fr 1fr 1fr;
+      text-align: center;
+    }
+
+    #search-input {
+      width: 100%;
+      outline: none;
+    }
+
+    .results-container {
+      display: grid;
+      
+
+    }
+
+    .search-result {
+      padding: 16px;
+      margin: 6px;
+    }
+
+    .search-result:hover {
+      text-decoration: none;
+    }
+
+    .article-title:hover {
+      text-decoration: underline;
+    }
+
+    .article-url {
+      color:#404040;
+      font-size: 10px;
+      text-decoration: none;
+    }
+
+    .article-text {
+      color:black;
+      font-size: 12px;
+      text-decoration: none;
+    }
+
+    .interactive button:active {
+      background-color: lightblue;
+    }
+
+    .interactive button:focus {
+      outline: none;
+    }
+
+
+    .lang-toggle {
+      line-height: 0mm;
+      padding: 18px;
+      font-style: italic;
+      color: black;
+      border-radius: 25px;
+      border: 2px solid black;
+      width: 50%;
+      align-self: center;
+      position: relative;
+      left: 18px; 
+    }
+
+    .back-click,.front-click {
+      align-self: center;
+      padding: 18px;
+      line-height: 0mm;
+      font-style: italic;
+      color: black;
+      border-radius: 25px;
+      border: 2px solid black;
+      width: 75%;
+    }
+
+  </style>
+
+  <!-- Maybe you want to use bootstrap to make it pretty? -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+  <script type="text/babel">
+  // Obtain the root
+  const rootElement = document.getElementById('root')
+
+  class SearchApp extends React.Component {
+    constructor(props) {
+      super(props);
+      this.handleInputChange = this.handleInputChange.bind(this);
+      this.handleBackwardClick = this.handleBackwardClick.bind(this);
+      this.handleForwardClick = this.handleForwardClick.bind(this);
+      this.handleDate = this.handleDate.bind(this);
+      this.handleLang = this.handleLang.bind(this);
+      this.displayResults = this.displayResults.bind(this);
+      this.splitText = this.splitText.bind(this);
+      this.fetchResults = this.fetchResults.bind(this);
+      this.state = {
+        clicked : false,
+        query: "",
+        searchResults : {},
+        date:"",
+        currPage: 0
+      }
+    }
+
+    handleInputChange(e) {
+      const query = e.target.value;
+      this.setState({query: query}, () => {
+        this.setState({currPage: 0});
+        this.fetchResults(query);
+      });
+    }
+
+    fetchResults(query) {
+      const currPage = this.state.currPage ? `&offset=${this.state.currPage * 10}` : "";
+      const lang = this.state.clicked == true ? '&language=en' : "";
+      const date = this.state.date ? `&date=${this.state.date}` : "";
+      //https://ssa-hw2-backend.stevetarzia.com/api/search?query=${query}${currPage}${lang}${date}
+      const searchUrl = `http://searchapi-env.eba-qe6xn33u.us-east-2.elasticbeanstalk.com/api/search?query=${query}${currPage}${lang}${date}`;
+      fetch(searchUrl)
+        .then(response => response.json())
+        .then(resultObj => this.setState({searchResults: resultObj}))
+        .catch(() => this.setState({searchResults: {}}));
+
+    }
+
+    displayResults() {
+      const searchResults = this.state.searchResults;
+      if(searchResults && searchResults.articles && searchResults.articles.length > 0) {
+        return (
+          <div className="results-container">
+            {searchResults.articles.map( searchResult => {
+              return (
+                <a key={searchResult.url} href={searchResult.url} className="search-result">
+                  <h6 className="article-url">{searchResult.url}</h6>
+                  <h2 className="article-title">{searchResult.title}</h2>
+                  <p className="article-text" dangerouslySetInnerHTML={{__html: this.highlightQuery(this.state.query,searchResult.txt)}}></p>
+                </a>
+              )    
+            })}
+          </div>
+        )
+      }
+    }
+
+    splitText(query, text) {
+      var start = text.toLowerCase().indexOf(query);
+      var end = start + text.substring(start+250).indexOf(' ') + 250;
+      return text.substring(start,end); 
+  
+
+    }
+
+    highlightQuery(query, text) {
+      const queries = query.toLowerCase().split(" ");
+      const snippet = this.splitText(queries[0],text) + " ...";
+      var bold = snippet.split(" ");
+      var bolded = [];
+      for(var i =0; i < bold.length; i++) {
+        if(queries.includes(bold[i].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,""))) {
+            bolded.push("<b>" + bold[i] + "</b>");
+        } else {
+          bolded.push(bold[i]); 
+        }
+      }
+      return bolded.join(" "); 
+    }
+
+    handleForwardClick(e) {
+      if(this.state.query.length) {
+        if((this.state.currPage+1) * 10 < this.state.searchResults.total_results) {
+          this.setState({currPage: this.state.currPage + 1}, () => {
+            this.fetchResults(this.state.query);   
+          });
+        }
+      }
+    }
+
+    handleBackwardClick(e) {
+      if(this.state.query.length) {
+        if(this.state.currPage > 0) {
+          this.setState({currPage: this.state.currPage - 1}, () => {
+            this.fetchResults(this.state.query);
+          });
+        }
+      }  
+    }
+
+    handleDate(e) {
+      const date = e.target.value;
+      if(this.state.query.length) {
+        this.setState({date: date}, () => {
+          this.setState({currPage: 0});
+          this.fetchResults(this.state.query);
+      });
+      }
+    }
+
+    handleLang(e) {
+      if(this.state.query.length) {
+        this.setState({clicked: !this.state.clicked,currPage:0}, () => {
+          this.fetchResults(this.state.query);
+      });
+      }
+        
+    }
+
+    render() {
+      const query = this.state.query;
+      return (
+        <div className="container">
+
+				<h2 className="heading">News Article Search</h2>
+
+        <div className="interactive">
+			
+          <label className="search-label" htmlFor="search-input">
+            <input
+              type="text"
+              name="query"
+              value={query}
+              id="search-input"
+              placeholder="Search..."
+              onChange = {this.handleInputChange}
+            />
+          </label>
+
+          <label className="date-label" htmlFor="date-input">
+            <input type="date" id="date-input" placeholder="Select date" onChange={this.handleDate}/>
+            </label>
+
+          <button className="lang-toggle" onClick={this.handleLang}>En</button>
+          <button className="back-click" onClick={this.handleBackwardClick}>Prev</button>
+          <button className="front-click" onClick={this.handleForwardClick}>Next</button>
+        </div>
+        {this.displayResults()}
+			  </div>
+      );
+    }
+  }
+
+  // Use the ReactDOM.render to show your component on the browser
+  ReactDOM.render(
+    <SearchApp />,
+    rootElement
+  )
+</script>
+
+</body>
+
+</html>
